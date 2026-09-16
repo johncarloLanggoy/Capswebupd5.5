@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Staff Availability Management - PetLink</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/staff.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/staff_availability.css') }}">
+</head>
+<body>
+    <div class="container">
+        <!-- ── HEADER ────────────────────────────────────────────────── -->
+        <div class="page-header">
+            <div>
+                <h1>📅 Staff Availability</h1>
+                <p>Manage which days and time slots are available for bookings</p>
+            </div>
+            <div class="header-actions">
+                <a href="/staff" class="btn-back">← Back to Staff Panel</a>
+                <button class="btn-save" onclick="saveAllSettings()">💾 Save All Settings</button>
+            </div>
+        </div>
+
+        <!-- ── LEGEND ──────────────────────────────────────────────────── -->
+        <div class="legend">
+            <span class="legend-title">📊 Legend:</span>
+            <div class="legend-item"><span class="legend-color open"></span> Day Open</div>
+            <div class="legend-item"><span class="legend-color closed"></span> Day Closed</div>
+            <div class="legend-item"><span class="legend-color active"></span> Time Slot Active</div>
+            <div class="legend-item"><span class="legend-color inactive"></span> Time Slot Inactive</div>
+            <div class="legend-item"><span class="legend-color date-closed"></span> Has Date Closure</div>
+            <div class="legend-item" style="color: #64748b; font-size: 12px;">Click a time slot to edit max bookings</div>
+        </div>
+
+        <!-- ── AVAILABILITY TABLE ─────────────────────────────────────── -->
+        <div class="availability-table-wrapper">
+            <table class="availability-table">
+                <thead>
+                    <tr>
+                        <th style="min-width: 160px;">Day</th>
+                        <th style="min-width: 120px; text-align: center;">Status</th>
+                        <th style="min-width: 120px; text-align: center;">Daily Slots</th>
+                        <th style="min-width: 300px;">Time Slots (Click to edit)</th>
+                    </tr>
+                </thead>
+                <tbody id="availabilityBody">
+                    <!-- Rows will be loaded by JavaScript -->
+                </tbody>
+            </table>
+        </div>
+
+        <!-- ── SAVE STATUS ────────────────────────────────────────────── -->
+        <div id="saveStatus"></div>
+    </div>
+
+    <!-- ── TIME SLOT EDIT POPUP ───────────────────────────────────────── -->
+    <div id="slotPopup" class="modal-overlay">
+        <div class="modal-popup" style="max-width: 400px;">
+            <h3 id="popupDayLabel">⏰ Edit Time Slot</h3>
+            <p class="modal-subtitle" id="popupTimeLabel">Adjust settings for this time slot</p>
+            <div class="form-group">
+                <label for="popupMaxSlots">Max Appointments per Slot</label>
+                <input type="number" id="popupMaxSlots" min="0" max="10" value="1" style="width:100%; padding:12px; background:#0f172a; border:1px solid #334155; border-radius:12px; color:#fff; font-size:14px;">
+                <span style="color: #64748b; font-size: 11px;">Set to 0 to disable this time slot</span>
+            </div>
+            <div class="form-group">
+                <label>Slot Status</label>
+                <div style="display:flex; align-items:center; gap:12px; cursor:pointer;">
+                    <span style="color:#94a3b8; font-size:13px;">Inactive</span>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="popupIsActive" checked>
+                        <span class="toggle-slider"></span>
+                    </label>
+                    <span style="color:#94a3b8; font-size:13px;">Active</span>
+                </div>
+            </div>
+            <div style="display:flex; gap:12px; margin-top:20px;">
+                <button class="modal-btn modal-btn-cancel" onclick="closeSlotPopup()">Cancel</button>
+                <button class="modal-btn modal-btn-submit" onclick="saveSlotSettings()" style="background:#38bdf8; color:#0f172a;">💾 Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── NEW CUSTOM DATE PICKER MODAL (NO TODAY BUTTON) ───────────── -->
+    <div id="specificDateModal" class="modal-overlay">
+        <div class="modal-popup" style="max-width: 450px;">
+            <h3>📅 Edit Specific Date</h3>
+            <p class="modal-subtitle">
+                Apply changes to a <strong>specific date</strong> instead of every <strong id="specificDayName" style="color:#38bdf8;">Monday</strong>.
+            </p>
+            
+            <!-- Custom Date Picker -->
+            <div class="cal-wrapper">
+                <div class="cal-header">
+                    <button class="cal-nav-btn" onclick="changeCalMonth(-1)">‹</button>
+                    <span class="cal-month-year" id="calMonthYear">January 2026</span>
+                    <button class="cal-nav-btn" onclick="changeCalMonth(1)">›</button>
+                </div>
+                <div class="cal-grid" id="calGrid">
+                    <!-- Calendar days generated by JS -->
+                </div>
+                <div class="cal-footer">
+                    <span class="cal-selected-label" id="calSelectedLabel">No date selected</span>
+                </div>
+            </div>
+
+            <!-- Action Type -->
+            <div class="form-group" style="margin-top: 15px;">
+                <label>Action for this date</label>
+                <select id="specificDateAction" style="width:100%; padding:12px; background:#0f172a; border:1px solid #334155; border-radius:12px; color:#fff; font-size:14px;">
+                    <option value="close">❌ Close Clinic (Add Closure)</option>
+                    <option value="open">✅ Force Open (Remove Closure)</option>
+                    <option value="edit_slots">📊 Edit Max Slots</option>
+                </select>
+            </div>
+            
+            <div class="form-group" id="specificDateSlotsGroup" style="display:none;">
+                <label>Max Slots for this date</label>
+                <input type="number" id="specificDateMaxSlots" value="3" min="0" style="width:100%; padding:12px; background:#0f172a; border:1px solid #334155; border-radius:12px; color:#fff;">
+            </div>
+
+            <div class="modal-buttons">
+                <button class="modal-btn modal-btn-cancel" onclick="closeSpecificDateModal()">Cancel</button>
+                <button class="modal-btn modal-btn-submit" onclick="applySpecificDateOverride()">Apply</button>
+            </div>
+        </div>
+    </div>
+<script src="{{ url_for('static', filename='js/staff_availability.js') }}"></script>
+</body>
+</html>
